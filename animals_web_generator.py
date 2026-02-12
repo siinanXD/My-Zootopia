@@ -50,25 +50,65 @@ def serialize_animal(animal: dict) -> str:
     return output
 
 
-
-
 def get_animals_info(animals_data: list[dict]) -> str:
     """Build the full HTML string for all animals."""
-    animals_info = ""
+    return "".join(serialize_animal(animal) for animal in animals_data)
+
+
+def get_available_skin_types(animals_data: list[dict]) -> list[str]:
+    """Return sorted unique skin_type values found in the JSON."""
+    skin_types = set()
+
     for animal in animals_data:
-        animals_info += serialize_animal(animal)
-    return animals_info
+        characteristics = animal.get("characteristics", {})
+        skin_type = characteristics.get("skin_type")
+        if skin_type:
+            skin_types.add(skin_type)
+
+    return sorted(skin_types)
+
+
+def filter_by_skin_type(animals_data: list[dict], selected_skin_type: str) -> list[dict]:
+    """Filter animals that match the selected skin_type (case-insensitive)."""
+    selected = selected_skin_type.strip().lower()
+    filtered = []
+
+    for animal in animals_data:
+        characteristics = animal.get("characteristics", {})
+        skin_type = characteristics.get("skin_type")
+
+        # Tiere ohne skin_type -> nicht anzeigen
+        if not skin_type:
+            continue
+
+        if skin_type.strip().lower() == selected:
+            filtered.append(animal)
+
+    return filtered
+
+
+def ask_user_for_skin_type(options: list[str]) -> str:
+    """Print options and ask the user to choose one. Repeats until valid."""
+    print("Available skin types:")
+    for opt in options:
+        print(f"- {opt}")
+
+    options_lower = {opt.lower(): opt for opt in options}
+
+    while True:
+        user_input = input("\nChoose a skin type from the list: ").strip()
+        if user_input.lower() in options_lower:
+            return options_lower[user_input.lower()]
+        print("Invalid skin type. Please type one exactly from the list.")
 
 
 def build_animals_page(
-        data_path: str = "animals_data.json",
+    animals_data: list[dict],
     template_path: str = "animals_template.html",
     output_path: str = "animals.html",
 ) -> None:
     """Create animals.html by filling the template with serialized animals."""
-    animals_data = load_data(data_path)
     template_html = load_website(template_path)
-
     animals_html = get_animals_info(animals_data)
     new_html = template_html.replace("__REPLACE_ANIMALS_INFO__", animals_html)
 
@@ -76,5 +116,20 @@ def build_animals_page(
         f.write(new_html)
 
 
+def main() -> None:
+    animals_data = load_data("animals_data.json")
+
+    options = get_available_skin_types(animals_data)
+    if not options:
+        print("No skin_type values found in the data.")
+        return
+
+    selected = ask_user_for_skin_type(options)
+    filtered_animals = filter_by_skin_type(animals_data, selected)
+
+    print(f"\nGenerating website for skin_type = {selected} ({len(filtered_animals)} animals).")
+    build_animals_page(filtered_animals)
+
+
 if __name__ == "__main__":
-    build_animals_page()
+    main()
